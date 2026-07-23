@@ -1,31 +1,33 @@
 function createStudyPlannerPrompt(studentData) {
-  return `
-You are an AI Study Planner.
+  return `You are an expert AI Study Schedule Planner.
 
-Based on the student's academic performance, create a personalized weekly study plan.
+Create a personalized 7-day weekly study schedule based on the following student goals. Respond ONLY with a valid JSON object. Do not include markdown fences, explanation, or extra text.
 
 Student Data:
 ${JSON.stringify(studentData, null, 2)}
 
-Return ONLY valid JSON in this format:
+Respond ONLY with this exact JSON structure:
 
 {
   "weeklyPlan": [
     {
-      "day": "",
-      "subjects": [],
-      "studyHours": 0,
-      "tasks": []
+      "day": "Monday",
+      "subjects": [
+        {
+          "subject": "Subject Name",
+          "hours": 2,
+          "task": "Actionable task or topic breakdown"
+        }
+      ]
     }
   ],
-  "revisionTips": [],
-  "examPreparation": []
+  "tips": [
+    "Actionable study tip 1",
+    "Actionable study tip 2"
+  ]
 }
 
-Do not include markdown.
-Do not include explanations.
-Return only JSON.
-`;
+CRITICAL: Return ONLY valid JSON. Include entries for all 7 days of the week (Monday through Sunday). No markdown fences like \`\`\`json, no preamble.`;
 }
 
 module.exports = {

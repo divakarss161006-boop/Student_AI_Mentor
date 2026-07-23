@@ -13,7 +13,8 @@ const connectDB = async () => {
       // Ignore if environment overrides DNS configuration
     }
 
-    const mongoURI = (process.env.MONGO_URI || "").trim();
+    const mongoURI =
+  (process.env.MONGO_URI || process.env.MONGODB_URI || "").trim();
 
     if (!mongoURI) {
       throw new Error("MONGO_URI is undefined or empty in environment variables");

@@ -1,27 +1,40 @@
 function createPerformancePrompt(studentData) {
-  return `
-You are an AI Student Performance Analyst.
+  return `You are an expert AI Student Academic Performance Analyst.
 
-Analyze the following student data and return ONLY valid JSON.
+Analyze the following student academic performance data and respond ONLY with a valid JSON object. Do not include markdown code fences, explanation, or extra text.
 
 Student Data:
 ${JSON.stringify(studentData, null, 2)}
 
-Return the response in this exact format:
+Rules:
+- strengths: list subjects where performance is high with clear reasoning
+- improvements: list subjects that need improvement with reasoning
+- recommendations: list actionable strategic advice for the student
+- summary: a 2-3 sentence overall assessment
+
+Respond ONLY with this exact JSON structure:
 
 {
-  "overallPerformance": "",
-  "strongSubjects": [],
-  "weakSubjects": [],
-  "strengths": [],
-  "areasToImprove": [],
-  "recommendations": []
+  "summary": "Overall 2-3 sentence academic summary",
+  "strengths": [
+    {
+      "subject": "Subject Name",
+      "reason": "Why this subject is a key strength"
+    }
+  ],
+  "improvements": [
+    {
+      "subject": "Subject Name",
+      "reason": "Why this subject needs improvement"
+    }
+  ],
+  "recommendations": [
+    "Strategic recommendation 1",
+    "Strategic recommendation 2"
+  ]
 }
 
-Do not include markdown.
-Do not include explanations.
-Return only JSON.
-`;
+CRITICAL: Return ONLY valid JSON. No markdown fences like \`\`\`json, no preamble.`;
 }
 
 module.exports = {

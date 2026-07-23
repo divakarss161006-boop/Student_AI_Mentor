@@ -5,26 +5,29 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Please add a name"],
+      required: [true, "Please enter your name"],
       trim: true,
     },
+
     email: {
       type: String,
-      required: [true, "Please add an email"],
+      required: [true, "Please enter your email"],
       unique: true,
       lowercase: true,
       trim: true,
       match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        "Please add a valid email",
+        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        "Please enter a valid email",
       ],
     },
+
     password: {
       type: String,
-      required: [true, "Please add a password"],
+      required: [true, "Please enter your password"],
       minlength: 6,
       select: false,
     },
+
     role: {
       type: String,
       enum: ["student", "admin"],
@@ -36,16 +39,19 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Encrypt password using bcrypt before saving (Async pre-save hook for Mongoose 9)
-userSchema.pre("save", async function () {
+// Hash password before saving
+userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
-    return;
+    return next();
   }
+
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+
+  next();
 });
 
-// Match user entered password to hashed password in database
+// Compare password
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

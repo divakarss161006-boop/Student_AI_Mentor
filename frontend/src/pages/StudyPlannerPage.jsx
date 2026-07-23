@@ -27,7 +27,7 @@ const StudyPlannerPage = () => {
   const [fetchingSaved, setFetchingSaved] = useState(true);
   const [studyPlanResult, setStudyPlanResult] = useState(null);
 
-  // Auto-fetch saved study plan on mount (Part 7)
+  // Auto-fetch saved study plan on mount
   useEffect(() => {
     const fetchLatest = async () => {
       try {
@@ -66,44 +66,62 @@ const StudyPlannerPage = () => {
 
       if (res.success && res.data) {
         setStudyPlanResult(res.data);
-        // Save to MongoDB history (Part 7)
         await saveAnalysisApi("StudyPlan", `Study Schedule until ${examDate}`, res.data);
         toast.success("AI Study plan generated & saved!");
       } else {
         toast.error(res.message || "Failed to generate study plan");
       }
     } catch (err) {
-      toast.error(err.message || "Server error generating study plan");
+      console.error("Study Plan Generation Error:", err);
+      toast.error(
+        err.response?.data?.message || err.message || "Server error generating study plan"
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleDownloadPlan = () => {
-    if (!studyPlanResult?.weeklyPlan) return;
+    const planData = studyPlanResult?.data || studyPlanResult?.aiAnalysis || studyPlanResult || {};
+    const weeklyPlan = Array.isArray(planData.weeklyPlan) ? planData.weeklyPlan : [];
+    if (!weeklyPlan.length) return;
 
     let content = `STUDENT AI MENTOR — CUSTOM STUDY PLAN\n`;
-    content += `Target Exam Date: ${examDate}\n`;
+    content += `Target Exam Date: ${examDate || "Upcoming Exam"}\n`;
     content += `Daily Target: ${studyHoursPerDay} Hours/Day\n`;
     content += `==========================================\n\n`;
 
-    studyPlanResult.weeklyPlan.forEach((dayPlan) => {
-      content += `DAY ${dayPlan.day || ""}: ${dayPlan.focusSubject || ""}\n`;
-      content += `Hours Allocated: ${dayPlan.hoursAllocated || ""}\n`;
-      content += `Topics to Cover:\n`;
-      dayPlan.topics?.forEach((t) => (content += `  - ${t}\n`));
+    weeklyPlan.forEach((dayPlan) => {
+      content += `DAY: ${dayPlan.day || ""}\n`;
+      if (Array.isArray(dayPlan.subjects)) {
+        dayPlan.subjects.forEach((s) => {
+          content += `  - Subject: ${s.subject} (${s.hours} Hrs)\n`;
+          content += `    Task: ${s.task}\n`;
+        });
+      } else {
+        content += `  - Focus: ${dayPlan.focusSubject || ""}\n`;
+      }
       content += `\n`;
     });
 
     const element = document.createElement("a");
     const file = new Blob([content], { type: "text/plain" });
     element.href = URL.createObjectURL(file);
-    element.download = `Study_Plan_${examDate}.txt`;
+    element.download = `Study_Plan_${examDate || "Weekly"}.txt`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
     toast.success("Study plan downloaded!");
   };
+
+  // Normalize Plan Data for Rendering
+  const planData = studyPlanResult?.data || studyPlanResult?.aiAnalysis || studyPlanResult || {};
+  const weeklyPlan = Array.isArray(planData.weeklyPlan) ? planData.weeklyPlan : [];
+  const tips = Array.isArray(planData.tips)
+    ? planData.tips
+    : Array.isArray(planData.revisionTips)
+    ? planData.revisionTips
+    : [];
 
   if (fetchingSaved) {
     return <LoadingSpinner label="Loading saved study plan..." />;
@@ -123,7 +141,7 @@ const StudyPlannerPage = () => {
           </p>
         </div>
 
-        {studyPlanResult?.weeklyPlan && (
+        {weeklyPlan.length > 0 && (
           <Button variant="primary" size="sm" onClick={handleDownloadPlan} icon={Download}>
             Download Plan (.txt)
           </Button>
@@ -181,46 +199,85 @@ const StudyPlannerPage = () => {
             <Card className="p-6">
               <LoadingSpinner label="Formulating weekly study schedule with Gemini AI..." />
             </Card>
-          ) : studyPlanResult?.weeklyPlan ? (
+          ) : weeklyPlan.length > 0 ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-extrabold text-slate-800 dark:text-white">
                   Weekly Study Roadmap
                 </h3>
-                <Badge variant="secondary">{studyPlanResult.weeklyPlan.length} Days Planned</Badge>
+                <Badge variant="secondary">{weeklyPlan.length} Days Planned</Badge>
               </div>
 
               <div className="space-y-4">
-                {studyPlanResult.weeklyPlan.map((dayPlan, idx) => (
+                {weeklyPlan.map((dayPlan, idx) => (
                   <Card key={idx} className="p-5 border-l-4 border-l-teal-500">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
                       <div>
                         <span className="text-[10px] font-bold tracking-widest text-teal-600 dark:text-teal-400 uppercase">
-                          Day {dayPlan.day || idx + 1}
+                          {dayPlan.day || `Day ${idx + 1}`}
                         </span>
                         <h4 className="text-sm font-extrabold text-slate-800 dark:text-white">
-                          {dayPlan.focusSubject || "Focus Subject"}
+                          {dayPlan.focusSubject || (dayPlan.subjects?.[0]?.subject) || "Study Sessions"}
                         </h4>
                       </div>
                       <Badge variant="accent" className="w-fit">
-                        <Clock className="w-3 h-3 mr-1" /> {dayPlan.hoursAllocated || 2} Hours
+                        <Clock className="w-3 h-3 mr-1" />{" "}
+                        {dayPlan.hoursAllocated ||
+                          dayPlan.subjects?.reduce((sum, s) => sum + (s.hours || 0), 0) ||
+                          studyHoursPerDay}{" "}
+                        Hours
                       </Badge>
                     </div>
 
-                    <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
-                      <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Target Topics:</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {dayPlan.topics?.map((topic, tIdx) => (
-                          <div key={tIdx} className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-teal-500 shrink-0" />
-                            <span>{topic}</span>
-                          </div>
-                        ))}
-                      </div>
+                    <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      {Array.isArray(dayPlan.subjects) && dayPlan.subjects.length > 0 ? (
+                        <div className="space-y-2">
+                          {dayPlan.subjects.map((subItem, sIdx) => (
+                            <div
+                              key={sIdx}
+                              className="p-3 rounded-xl bg-teal-50/50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-900/50 text-xs space-y-1"
+                            >
+                              <div className="flex items-center justify-between font-bold text-slate-800 dark:text-white">
+                                <span className="text-teal-700 dark:text-teal-400">• {subItem.subject}</span>
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  {subItem.hours || 2} Hours
+                                </span>
+                              </div>
+                              {subItem.task && (
+                                <p className="text-slate-600 dark:text-slate-400 text-[11px] pl-3">
+                                  Task: {subItem.task}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {dayPlan.topics?.map((topic, tIdx) => (
+                            <div key={tIdx} className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-teal-500 shrink-0" />
+                              <span>{topic}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </Card>
                 ))}
               </div>
+
+              {tips.length > 0 && (
+                <Card title="AI Revision & Exam Preparation Tips">
+                  <div className="space-y-2">
+                    {tips.map((tip, tIdx) => (
+                      <div key={tIdx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                        <Sparkles className="w-4 h-4 text-teal-500 shrink-0 mt-0.5" />
+                        <span>{tip}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
             </div>
           ) : (
             <Card className="min-h-[400px] flex flex-col items-center justify-center text-center p-8 space-y-4">

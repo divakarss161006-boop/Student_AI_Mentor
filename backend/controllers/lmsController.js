@@ -19,15 +19,20 @@ const analyzeLmsData = async (req, res) => {
 
     // Format student data for Gemini
     const studentData = {
-      name: req.user.name,
+      name: req.user?.name || "Student",
       subjects: subjects.map((s) => ({
-        subjectName: s.subjectName || s.name || "Subject",
+        subjectName: s.subjectName || s.subject || s.name || "Subject",
         score: Number(s.score || s.marks || 0),
         maxScore: Number(s.maxScore || 100),
       })),
     };
 
     const aiRes = await analyzePerformance(studentData);
+
+    const summary = aiRes.summary || "LMS performance evaluated.";
+    const strongSubjects = Array.isArray(aiRes.strongSubjects) ? aiRes.strongSubjects : [];
+    const weakSubjects = Array.isArray(aiRes.weakSubjects) ? aiRes.weakSubjects : [];
+    const targetSuggestions = Array.isArray(aiRes.targetSuggestions) ? aiRes.targetSuggestions : [];
 
     const totalScore = studentData.subjects.reduce((acc, curr) => acc + curr.score, 0);
     const averageScore = Math.round(totalScore / studentData.subjects.length);
@@ -36,24 +41,38 @@ const analyzeLmsData = async (req, res) => {
     const bestSubject = sorted[0]?.subjectName || "N/A";
     const weakestSubject = sorted[sorted.length - 1]?.subjectName || "N/A";
 
-    const record = await LmsRecord.create({
-      user: req.user._id,
-      fileName: fileName || "LMS_Export.xlsx",
-      subjects: studentData.subjects,
-      averageScore,
-      bestSubject,
-      weakestSubject,
-      aiAnalysis: aiRes,
-    });
+    // Save record to database for history tracking
+    try {
+      await LmsRecord.create({
+        user: req.user._id,
+        fileName: fileName || "LMS_Export.xlsx",
+        subjects: studentData.subjects,
+        averageScore,
+        bestSubject,
+        weakestSubject,
+        aiAnalysis: {
+          summary,
+          strongSubjects,
+          weakSubjects,
+          targetSuggestions,
+        },
+      });
+    } catch (dbErr) {
+      console.warn("LmsRecord DB save warning:", dbErr.message);
+    }
 
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: "LMS data analyzed successfully",
-      data: record,
+      data: {
+        summary,
+        strongSubjects,
+        weakSubjects,
+        targetSuggestions,
+      },
     });
   } catch (error) {
     console.error("LMS Controller Error:", error.message);
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
       message: "Unable to analyze LMS data: " + error.message,
     });

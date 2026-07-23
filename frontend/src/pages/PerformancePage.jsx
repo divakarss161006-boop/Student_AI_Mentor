@@ -30,7 +30,7 @@ const PerformancePage = () => {
   const [fetchingSaved, setFetchingSaved] = useState(true);
   const [analysisResult, setAnalysisResult] = useState(null);
 
-  // Auto-fetch saved performance analysis on mount (Part 7)
+  // Auto-fetch saved performance analysis on mount
   useEffect(() => {
     const fetchLatest = async () => {
       try {
@@ -81,14 +81,15 @@ const PerformancePage = () => {
 
       if (res.success && res.data) {
         setAnalysisResult(res.data);
-        // Save to MongoDB history (Part 7)
         await saveAnalysisApi("Performance", `Academic Analysis`, res.data);
         toast.success("Performance analysis complete & saved!");
       } else {
         toast.error(res.message || "Failed to analyze performance");
       }
     } catch (err) {
-      toast.error(err.message || "An error occurred during analysis");
+      toast.error(
+        err.response?.data?.message || err.message || "An error occurred during analysis"
+      );
     } finally {
       setLoading(false);
     }
@@ -96,6 +97,17 @@ const PerformancePage = () => {
 
   const totalScore = subjects.reduce((acc, curr) => acc + (curr.score || 0), 0);
   const averageScore = subjects.length ? Math.round(totalScore / subjects.length) : 0;
+
+  // Normalize Analysis Data for Rendering
+  const analysisData = analysisResult?.data || analysisResult?.aiAnalysis || analysisResult || {};
+  const summaryText = analysisData.summary || analysisData.overallPerformance || "Performance evaluated successfully.";
+  const strengthsList = Array.isArray(analysisData.strengths) ? analysisData.strengths : [];
+  const improvementsList = Array.isArray(analysisData.improvements)
+    ? analysisData.improvements
+    : Array.isArray(analysisData.areasToImprove)
+    ? analysisData.areasToImprove
+    : [];
+  const recommendationsList = Array.isArray(analysisData.recommendations) ? analysisData.recommendations : [];
 
   if (fetchingSaved) {
     return <LoadingSpinner label="Loading saved performance analysis..." />;
@@ -191,31 +203,57 @@ const PerformancePage = () => {
               {/* Overall Summary Card */}
               <Card title="Overall AI Academic Performance" className="border-l-4 border-l-blue-600">
                 <p className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {analysisResult.overallPerformance || "Performance evaluated successfully."}
+                  {summaryText}
                 </p>
               </Card>
 
               {/* Strengths & Weaknesses */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card title="Key Strengths">
-                  <div className="space-y-2">
-                    {analysisResult.strengths?.map((item, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {strengthsList.length > 0 ? (
+                      strengthsList.map((item, idx) => (
+                        <div key={idx} className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 space-y-1 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              • {typeof item === "string" ? item : item.subject || item.name}
+                            </span>
+                          </div>
+                          {typeof item === "object" && item.reason && (
+                            <p className="text-slate-600 dark:text-slate-400 pl-6 text-[11px]">
+                              • {item.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No key strengths recorded.</p>
+                    )}
                   </div>
                 </Card>
 
                 <Card title="Areas to Improve">
-                  <div className="space-y-2">
-                    {analysisResult.areasToImprove?.map((item, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
-                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                        <span>{item}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {improvementsList.length > 0 ? (
+                      improvementsList.map((item, idx) => (
+                        <div key={idx} className="p-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/60 border border-rose-100 dark:border-rose-800 space-y-1 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                            <span className="font-bold text-slate-900 dark:text-white">
+                              • {typeof item === "string" ? item : item.subject || item.name}
+                            </span>
+                          </div>
+                          {typeof item === "object" && item.reason && (
+                            <p className="text-slate-600 dark:text-slate-400 pl-6 text-[11px]">
+                              • {item.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No areas to improve recorded.</p>
+                    )}
                   </div>
                 </Card>
               </div>
@@ -223,11 +261,15 @@ const PerformancePage = () => {
               {/* Recommendations */}
               <Card title="AI Strategic Recommendations">
                 <div className="space-y-3">
-                  {analysisResult.recommendations?.map((item, idx) => (
-                    <div key={idx} className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800 text-xs font-medium text-slate-700 dark:text-slate-300">
-                      💡 {item}
-                    </div>
-                  ))}
+                  {recommendationsList.length > 0 ? (
+                    recommendationsList.map((item, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-blue-50/60 dark:bg-blue-950/60 border border-blue-100 dark:border-blue-800 text-xs font-medium text-slate-700 dark:text-slate-300">
+                        💡 {typeof item === "string" ? item : item.studyPlan || item.recommendation || JSON.stringify(item)}
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No strategic recommendations generated.</p>
+                  )}
                 </div>
               </Card>
             </div>

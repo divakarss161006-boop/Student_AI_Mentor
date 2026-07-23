@@ -26,12 +26,16 @@ const getPerformanceAnalysis = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Performance analysis generated successfully",
-      data: result,
+      data: {
+        summary: result.summary || "Performance evaluated successfully.",
+        strengths: Array.isArray(result.strengths) ? result.strengths : [],
+        improvements: Array.isArray(result.improvements) ? result.improvements : [],
+        recommendations: Array.isArray(result.recommendations) ? result.recommendations : [],
+      },
     });
   } catch (error) {
     console.error("AI Performance Controller Error:", error.message);
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
       message: "Unable to generate AI performance analysis: " + error.message,
     });
@@ -58,12 +62,14 @@ const getStudyPlan = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Study plan generated successfully",
-      data: result,
+      data: {
+        weeklyPlan: Array.isArray(result.weeklyPlan) ? result.weeklyPlan : [],
+        tips: Array.isArray(result.tips) ? result.tips : [],
+      },
     });
   } catch (error) {
     console.error("AI Study Plan Controller Error:", error.message);
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
       message: "Unable to generate study plan: " + error.message,
     });
@@ -90,12 +96,11 @@ const getMentorChat = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Mentor response generated successfully",
       data: result,
     });
   } catch (error) {
     console.error("AI Mentor Controller Error:", error.message);
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
       message: "Unable to generate AI mentor response: " + error.message,
     });
@@ -122,12 +127,11 @@ const getResumeAnalysis = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Resume analysis generated successfully",
       data: result,
     });
   } catch (error) {
     console.error("AI Resume Controller Error:", error.message);
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
       message: "Unable to analyze resume: " + error.message,
     });
@@ -135,7 +139,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 /**
- * @desc    Upload PDF resume, extract text using pdf-parse v2.4.5 PDFParse class, and analyze using Gemini AI
+ * @desc    Upload PDF resume, extract text using pdf-parse, and analyze using Gemini AI
  * @route   POST /api/ai/resume/upload
  * @access  Private
  */
@@ -151,11 +155,6 @@ const getResumeAnalysisUpload = async (req, res) => {
       });
     }
 
-    console.log(`✓ File name: ${req.file.originalname}`);
-    console.log(`✓ File size: ${req.file.size} bytes`);
-    console.log(`✓ MIME type: ${req.file.mimetype}`);
-    console.log("✓ Correct import type: { PDFParse } from pdf-parse@2.4.5");
-
     let parsedResult;
     try {
       const parser = new PDFParse({ data: req.file.buffer });
@@ -170,40 +169,25 @@ const getResumeAnalysisUpload = async (req, res) => {
     }
 
     const rawText = (parsedResult?.text || "").trim();
-
-    // Strip header lines like "-- 1 of 1 --" if present
     const extractedText = rawText.replace(/-- \d+ of \d+ --/g, "").trim();
 
-    const pageCount = parsedResult?.total || parsedResult?.pages?.length || 1;
-
-    console.log(`✓ Pages: ${pageCount}`);
-
     if (!extractedText || extractedText.length < 5) {
-      console.warn("❌ PDF text extraction failed: PDF contains no readable text.");
       return res.status(400).json({
         success: false,
         message: "PDF contains no readable text.",
       });
     }
 
-    console.log("✓ Text extracted");
-    console.log(`✓ Character count: ${extractedText.length}`);
-
-    console.log("✓ Gemini request sent");
     const result = await analyzeResume(extractedText);
-
-    console.log("✓ Gemini response received");
-    console.log("✓ Final API response ready");
 
     return res.json({
       success: true,
-      message: "Resume ATS analysis generated successfully",
       data: result,
       extractedText,
     });
   } catch (error) {
     console.error("Resume Upload Controller Exception:", error.message);
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
       message: "Gemini analysis failed: " + error.message,
     });

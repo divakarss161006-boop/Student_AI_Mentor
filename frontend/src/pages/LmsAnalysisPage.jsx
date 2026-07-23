@@ -31,7 +31,7 @@ const LmsAnalysisPage = () => {
   const [fetchingSaved, setFetchingSaved] = useState(true);
   const [lmsResult, setLmsResult] = useState(null);
 
-  // Auto-fetch saved LMS analysis on mount (Part 7: Persist AI Analysis)
+  // Auto-fetch saved LMS analysis on mount
   useEffect(() => {
     const fetchLatest = async () => {
       try {
@@ -127,14 +127,16 @@ const LmsAnalysisPage = () => {
       const res = await analyzeLmsDataApi(fileName || "LMS_Record.xlsx", extractedSubjects);
       if (res.success && res.data) {
         setLmsResult(res.data);
-        // Persist to MongoDB history (Part 7)
         await saveAnalysisApi("LMS", `LMS Report: ${fileName || "Marks File"}`, res.data);
-        toast.success("LMS Performance analysis saved!");
+        toast.success("LMS Performance analysis generated!");
       } else {
         toast.error(res.message || "Failed to analyze LMS data");
       }
     } catch (err) {
-      toast.error(err.message || "Server error during LMS analysis");
+      console.error("LMS Analysis Error:", err);
+      toast.error(
+        err.response?.data?.message || err.message || "Server error during LMS analysis"
+      );
     } finally {
       setLoading(false);
     }
@@ -145,6 +147,13 @@ const LmsAnalysisPage = () => {
   const sorted = [...extractedSubjects].sort((a, b) => (b.score || 0) - (a.score || 0));
   const best = sorted[0]?.subjectName || "N/A";
   const weakest = sorted[sorted.length - 1]?.subjectName || "N/A";
+
+  // Normalize LMS analysis result for display
+  const analysisData = lmsResult?.data || lmsResult?.aiAnalysis || lmsResult || {};
+  const summaryText = analysisData.summary || analysisData.overallPerformance || "LMS performance evaluated.";
+  const strongSubjectsList = Array.isArray(analysisData.strongSubjects) ? analysisData.strongSubjects : [];
+  const weakSubjectsList = Array.isArray(analysisData.weakSubjects) ? analysisData.weakSubjects : [];
+  const targetSuggestionsList = Array.isArray(analysisData.targetSuggestions) ? analysisData.targetSuggestions : [];
 
   if (fetchingSaved) {
     return <LoadingSpinner label="Loading saved LMS analysis..." />;
@@ -289,45 +298,89 @@ const LmsAnalysisPage = () => {
           ) : lmsResult ? (
             <div className="space-y-6">
               {/* Summary */}
-              <Card title="LMS AI Analysis & Strategy" className="border-l-4 border-l-emerald-600">
+              <Card title="Summary" className="border-l-4 border-l-emerald-600">
                 <p className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {lmsResult.aiAnalysis?.overallPerformance || lmsResult.overallPerformance || "LMS performance evaluated."}
+                  {summaryText}
                 </p>
               </Card>
 
-              {/* Strengths & Weaknesses */}
+              {/* Strong & Weak Subjects */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card title="Strong Subjects">
-                  <div className="space-y-2">
-                    {(lmsResult.aiAnalysis?.strengths || lmsResult.strengths)?.map((str, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                        <span>{str}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {strongSubjectsList.length > 0 ? (
+                      strongSubjectsList.map((item, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 space-y-1 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                            <span className="font-bold text-slate-900 dark:text-white">• {item.subject || item.name || item}</span>
+                          </div>
+                          {item.reason && (
+                            <p className="text-slate-600 dark:text-slate-400 pl-6 text-[11px]">
+                              • {item.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No strong subjects detected.</p>
+                    )}
                   </div>
                 </Card>
 
                 <Card title="Weak Subjects Detected">
-                  <div className="space-y-2">
-                    {(lmsResult.aiAnalysis?.areasToImprove || lmsResult.areasToImprove)?.map((area, i) => (
-                      <div key={i} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300 font-medium">
-                        <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                        <span>{area}</span>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    {weakSubjectsList.length > 0 ? (
+                      weakSubjectsList.map((item, i) => (
+                        <div key={i} className="p-3 rounded-xl bg-rose-50/60 dark:bg-rose-950/60 border border-rose-100 dark:border-rose-800 space-y-1 text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0" />
+                            <span className="font-bold text-slate-900 dark:text-white">• {item.subject || item.name || item}</span>
+                          </div>
+                          {item.reason && (
+                            <p className="text-slate-600 dark:text-slate-400 pl-6 text-[11px]">
+                              • {item.reason}
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">No weak subjects detected.</p>
+                    )}
                   </div>
                 </Card>
               </div>
 
-              {/* Action Plan */}
+              {/* Target Suggestions & Improvement Plan */}
               <Card title="Target Score Suggestions & Improvement Plan">
                 <div className="space-y-3">
-                  {(lmsResult.aiAnalysis?.recommendations || lmsResult.recommendations)?.map((rec, i) => (
-                    <div key={i} className="p-3 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 text-xs font-medium text-slate-700 dark:text-slate-300">
-                      🎯 {rec}
-                    </div>
-                  ))}
+                  {targetSuggestionsList.length > 0 ? (
+                    targetSuggestionsList.map((item, i) => (
+                      <div
+                        key={i}
+                        className="p-4 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/60 border border-emerald-100 dark:border-emerald-800 text-xs space-y-2 text-slate-700 dark:text-slate-300"
+                      >
+                        <div className="font-bold text-sm text-emerald-700 dark:text-emerald-400">
+                          {item.subject}
+                        </div>
+                        <div className="space-y-1 pl-2">
+                          <p className="text-slate-700 dark:text-slate-300">
+                            • <strong>Current Score:</strong> {item.currentScore}%
+                          </p>
+                          <p className="text-slate-700 dark:text-slate-300">
+                            • <strong>Target Score:</strong> {item.targetScore}%
+                          </p>
+                          {item.studyPlan && (
+                            <p className="text-slate-600 dark:text-slate-400 leading-relaxed pt-1 border-t border-emerald-200/50 dark:border-emerald-800/50">
+                              • <strong>Improvement Strategy:</strong> {item.studyPlan}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">No target suggestions available.</p>
+                  )}
                 </div>
               </Card>
             </div>

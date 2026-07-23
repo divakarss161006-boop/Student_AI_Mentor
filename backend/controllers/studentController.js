@@ -1,8 +1,7 @@
 const Student = require("../models/Student");
-const mongoose = require("mongoose");
 
 /**
- * @desc    Get student profile for logged in user
+ * @desc    Get student profile
  * @route   GET /api/students/profile
  * @access  Private
  */
@@ -11,29 +10,35 @@ const getStudentProfile = async (req, res) => {
     let student = await Student.findOne({ user: req.user._id });
 
     if (!student) {
+      const studentName =
+        req.user.name ||
+        req.user.fullName ||
+        req.body?.name ||
+        "Student";
+
       student = await Student.create({
         user: req.user._id,
-        name: req.user.name,
+        name: studentName,
         email: req.user.email,
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: "Student profile fetched successfully",
       data: student,
     });
   } catch (error) {
-    console.error("Get Student Profile Error:", error.message);
+    console.error("Get Student Profile Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error fetching student profile: " + error.message,
+      message: error.message,
     });
   }
 };
 
 /**
- * @desc    Create or update student profile (upsert)
+ * @desc    Create / Update Student Profile
  * @route   POST /api/students/profile
  * @access  Private
  */
@@ -41,55 +46,67 @@ const upsertStudentProfile = async (req, res) => {
   try {
     let student = await Student.findOne({ user: req.user._id });
 
-    const { subjects, examDate, targetScore, weakSubjects, bio, name, email } = req.body;
-
     if (!student) {
       student = new Student({
         user: req.user._id,
-        name: name || req.user.name,
-        email: email || req.user.email,
+        name:
+          req.body.name ||
+          req.user.name ||
+          req.user.fullName ||
+          "Student",
+        email: req.body.email || req.user.email,
       });
     }
 
-    if (subjects) student.subjects = subjects;
-    if (examDate) student.examDate = examDate;
-    if (targetScore) student.targetScore = targetScore;
-    if (weakSubjects) student.weakSubjects = weakSubjects;
-    if (bio !== undefined) student.bio = bio;
+    if (req.body.subjects)
+      student.subjects = req.body.subjects;
 
-    const savedStudent = await student.save();
+    if (req.body.grade)
+      student.grade = req.body.grade;
+
+    if (req.body.performanceData)
+      student.performanceData = req.body.performanceData;
+
+    if (req.body.studyPlan)
+      student.studyPlan = req.body.studyPlan;
+
+    if (req.body.resumeText)
+      student.resumeText = req.body.resumeText;
+
+    if (req.body.goals)
+      student.goals = req.body.goals;
+
+    await student.save();
 
     return res.status(200).json({
       success: true,
       message: "Student profile saved successfully",
-      data: savedStudent,
+      data: student,
     });
   } catch (error) {
-    console.error("Upsert Student Profile Error:", error.message);
-    return res.status(400).json({
+    console.error("Upsert Student Profile Error:", error);
+    return res.status(500).json({
       success: false,
-      message: "Server error saving student profile: " + error.message,
+      message: error.message,
     });
   }
 };
 
 /**
- * @desc    Update student profile
- * @route   PUT /api/students/profile
- * @access  Private
+ * @desc    Update Student Profile
  */
 const updateStudentProfile = async (req, res) => {
   return upsertStudentProfile(req, res);
 };
 
 /**
- * @desc    Delete student profile
- * @route   DELETE /api/students/profile
- * @access  Private
+ * @desc    Delete Student Profile
  */
 const deleteStudentProfile = async (req, res) => {
   try {
-    const student = await Student.findOneAndDelete({ user: req.user._id });
+    const student = await Student.findOneAndDelete({
+      user: req.user._id,
+    });
 
     if (!student) {
       return res.status(404).json({
@@ -98,38 +115,37 @@ const deleteStudentProfile = async (req, res) => {
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: "Student profile deleted successfully",
-      data: null,
     });
   } catch (error) {
-    console.error("Delete Student Profile Error:", error.message);
+    console.error("Delete Student Profile Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error deleting student profile: " + error.message,
+      message: error.message,
     });
   }
 };
 
 /**
- * @desc    Get all students
- * @route   GET /api/students
- * @access  Private
+ * @desc    Get All Students
  */
 const getAllStudents = async (req, res) => {
   try {
-    const students = await Student.find({}).sort({ createdAt: -1 });
-    return res.json({
+    const students = await Student.find().sort({
+      createdAt: -1,
+    });
+
+    return res.status(200).json({
       success: true,
-      message: "All students fetched successfully",
       data: students,
     });
   } catch (error) {
-    console.error("Get All Students Error:", error.message);
+    console.error("Get All Students Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error fetching students: " + error.message,
+      message: error.message,
     });
   }
 };
